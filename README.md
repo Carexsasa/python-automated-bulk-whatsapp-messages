@@ -1,93 +1,58 @@
-# Python Automated Bulk WhatsApp Messages
+# GroceryCompare 🇩🇪 — where's this grocery item cheapest this week?
 
-It is a python script that sends WhatsApp message automatically from WhatsApp web application with saved contact numbers. It can be configured to send advertising messages to customers. It read data from an excel sheet and send a configured message to people.
+> Type or speak a grocery item (e.g. *"Kartoffeln"*) and get a **ranked list** of where
+> it's cheapest this week across **Lidl, Aldi Süd, Aldi Nord, Netto Marken-Discount and
+> Kaufland** — with store, product name, **€/kg or €/l unit price**, offer validity dates,
+> whether it's a regular price or a weekly *Angebot*, and distance to the nearest branch.
 
-## Contact me over Telegram: https://t.me/inforkgodara
+> ⚠️ This feature branch (`claude/grocery-price-comparison-ei3i9c`) repurposes the
+> repository for the GroceryCompare project. The legacy WhatsApp bulk-message script
+> (`script.py`, `chromedriver.exe`, `Customer bulk email data.xlsx`) is left in place and is
+> unrelated to this project.
 
-## Note
-This is for saved contact numbers only if you want to send whatsapp bulk messages to unsaved or without saving the contact numbers. You may prefer another repository.
-* Repository: https://github.com/inforkgodara/whatsapp-bulk-messages-without-saving-contacts
+## What's here
 
-## Important
-* WhatsApp Business released API on May 2022, no longer needed this repository. You can accomplish your same requirements through WhatsApp Business APIs.
+| Path | What | Status |
+|---|---|---|
+| [`docs/01-data-source-research.md`](docs/01-data-source-research.md) | **Deliverable 1** — per-chain data-source research, stability & legal notes | ✅ |
+| [`backend/`](backend/) | **Deliverable 2** — FastAPI scraper + normalizer, one chain (Marktguru) end-to-end; the other four scaffolded (**Deliverable 4**) | ✅ backend + primary chain working & tested |
+| [`android/`](android/) | **Deliverable 3** — Kotlin/Compose app skeleton, search wired to the backend | ✅ skeleton (build in Android Studio) |
+| [`docs/architecture.md`](docs/architecture.md) | System architecture diagram + decisions | ✅ |
+| [`docs/legal-and-robustness.md`](docs/legal-and-robustness.md) | robots.txt/ToS/rate-limit/isolation policy | ✅ |
 
-## Prerequisites
+## The core idea
+- **One aggregator covers all five chains.** Marktguru exposes a PLZ-keyed JSON
+  offer API used by its own web app. That's the primary source and the end-to-end slice.
+  Each chain's first-party leaflet feed is an isolated **fallback**, disabled until verified.
+- **Normalization is the hard part** and it's done deterministically on the server:
+  parse German package sizes (`2 kg`, `6 x 1,5 l`, `500-750 g`, `12 Eier`), convert to
+  **€/kg / €/l**, and fuzzy-match German synonyms (Kartoffeln ↔ Speisekartoffeln ↔
+  festkochend). Fully unit-tested.
+- **The phone never scrapes.** All fetching/parsing runs server-side on a weekly schedule
+  (Sun night / Mon morning); the app just reads a clean normalized API and caches it in
+  Room for offline use.
+- **Everything is keyed by PLZ + offer week** — regional pricing and the Aldi Süd/Nord
+  split demand it.
 
-In order to run the python script, your system must have the following programs/packages installed and the contact number should be saved in your phone (You can use bulk contact number saving procedure of email). There is a way without saving the contact number but has the limitation to send the attachment.
-* Python 3.8: Download it from https://www.python.org/downloads
-* Selenium Web Driver: Either you can use repo driver else you can download it https://chromedriver.chromium.org/downloads
-* Google Chrome : Download it from https://www.google.com/chrome
-* Pandas : Run in command prompt **pip install pandas**
-* Xlrd : Run in command prompt **pip install xlrd**
-* Selenium: Run in command prompt **pip install selenium** 
-
-## Approach
-* User scans web QR code to log in into the WhatsApp web application.
-* The script reads a customized message from excel sheet.
-* The script reads rows one by one and searches that contact number in the web search box if the contact number found on WhatsApp then it will send a configured message otherwise It reads next row. 
-* Loop execute until and unless all rows complete.
-
-Note: If you wish to send an image instead of text you can write attachment selection python code.
-
-## Legal
-* This code is in no way affiliated with, authorized, maintained, sponsored or endorsed by WhatsApp or any of its affiliates or subsidiaries. This is an independent and unofficial software. Use at your own risk. Commercial use of this code/repo is strictly prohibited.
-
-## Code
+## Quick start (backend)
+```bash
+cd backend
+pip install -r requirements.txt
+python3 -m pytest -q                 # 30 tests: normalizer + primary connector + service
+uvicorn app.main:app --port 8000     # serves /search /autocomplete /basket /health
 ```
-# Program to send bulk customized message through WhatsApp web application
-# Author @inforkgodara
+See [`backend/README.md`](backend/README.md) and [`android/README.md`](android/README.md).
 
-from selenium import webdriver
-from selenium.webdriver.support.ui import WebDriverWait
-from selenium.webdriver.common.keys import Keys
-from selenium.webdriver.common.action_chains import ActionChains
-from selenium.common.exceptions import NoSuchElementException
-import pandas
-import time
+## Status against the deliverables
+1. ✅ **Data-source research per chain** — availability, stability, legal notes.
+2. ✅ **Backend scraper + normalizer for ONE chain, end to end** — Marktguru connector
+   (covers all 5 advertisers) → normalizer → PLZ/week SQLite cache → `/search` API, with a
+   fixture-driven test proving the full path.
+3. ✅ **Android skeleton with search against that chain** — MVVM/Compose/Hilt/Retrofit/Room/
+   WorkManager; search, autocomplete, voice, distance, watch, offline.
+4. 🚧 **Remaining chains** — Lidl, Aldi Süd/Nord, Netto, Kaufland parsers
+   scaffolded and isolated; each is disabled until its live endpoint is captured and a
+   fixture test is added (the research doc records how). Marktguru already returns offers
+   for all five today.
 
-# Load the chrome driver
-driver = webdriver.Chrome()
-count = 0
-
-# Open WhatsApp URL in chrome browser
-driver.get("https://web.whatsapp.com/")
-wait = WebDriverWait(driver, 20)
-
-# Read data from excel
-excel_data = pandas.read_excel('Customer bulk email data.xlsx', sheet_name='Customers')
-message = excel_data['Message'][0]
-
-# Iterate excel rows till to finish
-for column in excel_data['Name'].tolist():
-    # Locate search box through x_path
-    search_box = '//*[@id="side"]/div[1]/div/label/div/div[2]'
-    person_title = wait.until(lambda driver:driver.find_element_by_xpath(search_box))
-
-    # Clear search box if any contact number is written in it
-    person_title.clear()
-
-    # Send contact number in search box
-    person_title.send_keys(str(excel_data['Contact'][count]))
-    count = count + 1
-
-    # Wait for 3 seconds to search contact number
-    time.sleep(3)
-
-    try:
-        # Load error message in case unavailability of contact number
-        element = driver.find_element_by_xpath('//*[@id="pane-side"]/div[1]/div/span')
-    except NoSuchElementException:
-        # Format the message from excel sheet
-        message = message.replace('{customer_name}', column)
-        person_title.send_keys(Keys.ENTER)
-        actions = ActionChains(driver)
-        actions.send_keys(message)
-        actions.send_keys(Keys.ENTER)
-        actions.perform()
-
-# Close Chrome browser
-driver.quit()
-```
-Note: The script may not work in case if the HTML of web WhatsApp is changed.
-
-Find it on youtube. https://youtu.be/NcWXpsczl3c
+> **Disclaimer shown in-app:** *Prices are indicative — verify in store.*
