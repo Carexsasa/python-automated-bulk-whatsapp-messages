@@ -3,7 +3,20 @@
 Scheduled scraper + normalizer that serves a clean, PLZ-keyed API of weekly German
 discounter offers. **The phone never scrapes — this server does.**
 
-## Run
+## Quickest start (demo mode — zero manual steps)
+No API keys, no manual seeding. The server auto-loads sample offers for whatever zipcode
+you search.
+
+- **Windows:** double-click `run_demo.bat` (or run it in a terminal from the `backend` folder).
+- **macOS/Linux:** `bash run_demo.sh`
+
+Then open **http://localhost:8000/docs**, expand **GET /search**, click **Try it out**, set
+`q = Kartoffeln` and `plz =` *your zipcode*, and **Execute**. Results appear immediately.
+
+To pre-warm specific regions instead: `python seed.py 80331 85354`.
+To use real (non-demo) data, start without `DEMO_MODE=1` (see below).
+
+## Run (manual)
 ```bash
 cd backend
 python3 -m venv .venv && source .venv/bin/activate

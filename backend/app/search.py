@@ -8,6 +8,7 @@ from __future__ import annotations
 from typing import Optional
 
 from .config import offer_week, settings
+from .demo import ensure_seeded
 from .models import Chain, NormalizedOffer, SearchResponse
 from .normalizer import matcher
 from .store import db, locator
@@ -16,6 +17,7 @@ from .store import db, locator
 def _current_offers(plz: str) -> tuple[str, list[NormalizedOffer]]:
     """Offers for the current week, falling back to the latest cached week (offline)."""
     week = offer_week()
+    ensure_seeded(plz)  # demo mode: auto-load sample data for a fresh PLZ
     offers = db.load_offers(plz, week)
     if not offers:
         fallback = db.latest_week_for(plz)
@@ -46,7 +48,8 @@ def search(
     threshold: float = 0.35,
     limit: int = 50,
 ) -> SearchResponse:
-    plz = plz or settings.DEFAULT_PLZ
+    plz = (plz or settings.DEFAULT_PLZ).strip()
+    query = query.strip()
     week, offers = _current_offers(plz)
 
     # fuzzy match + score
@@ -77,6 +80,7 @@ def search(
 
 def autocomplete(prefix: str, plz: str, limit: int = 10) -> list[str]:
     """Distinct product-name suggestions matching a prefix, from the region's cache."""
+    plz = (plz or settings.DEFAULT_PLZ).strip()
     _, offers = _current_offers(plz)
     pl = prefix.lower().strip()
     seen: list[str] = []
@@ -98,6 +102,7 @@ def best_basket(
       * ``single_store``: the one chain that minimizes the *total* for all found items.
       * ``optimal_split``: the cheapest offer per item regardless of store.
     """
+    plz = (plz or settings.DEFAULT_PLZ).strip()
     per_item: dict[str, list[NormalizedOffer]] = {}
     for it in items:
         res = search(it, plz, lat=lat, lon=lon, max_distance_km=max_distance_km, limit=20)

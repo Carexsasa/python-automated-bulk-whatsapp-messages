@@ -61,7 +61,11 @@ def health() -> HealthResponse:
                 offer_count=n,
             )
         )
-    return HealthResponse(status="ok", offer_week=offer_week(), chains=chains)
+    return HealthResponse(
+        status="demo" if settings.DEMO_MODE else "ok",
+        offer_week=offer_week(),
+        chains=chains,
+    )
 
 
 @app.get("/search", response_model=SearchResponse)

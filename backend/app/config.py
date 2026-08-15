@@ -31,6 +31,10 @@ class Settings:
     # Data source toggle: prefer the aggregator (covers all chains) unless disabled.
     USE_AGGREGATOR = os.getenv("USE_AGGREGATOR", "1") == "1"
 
+    # Demo mode: auto-seed packaged sample offers for any searched PLZ that has no data,
+    # so the app works out of the box with no keys and no manual seeding.
+    DEMO_MODE = os.getenv("DEMO_MODE", "0") == "1"
+
 
 settings = Settings()
 
