@@ -10,6 +10,7 @@ from typing import Optional
 
 from fastapi import FastAPI, Query
 
+from .autorefresh import ensure_fresh
 from .chains import ALL_PARSERS
 from .config import offer_week, settings
 from .models import (
@@ -69,7 +70,7 @@ def health() -> HealthResponse:
 
 
 @app.get("/search", response_model=SearchResponse)
-def search_endpoint(
+async def search_endpoint(
     q: str = Query(..., min_length=1, description="Item, e.g. 'Kartoffeln'"),
     plz: str = Query(settings.DEFAULT_PLZ, description="5-digit German postal code"),
     lat: Optional[float] = None,
@@ -77,27 +78,33 @@ def search_endpoint(
     max_distance_km: Optional[float] = None,
     limit: int = 50,
 ) -> SearchResponse:
+    plz = plz.strip()
+    await ensure_fresh(plz)  # live mode: fetch this region on first use
     return search(
         q, plz, lat=lat, lon=lon, max_distance_km=max_distance_km, limit=limit
     )
 
 
 @app.get("/autocomplete")
-def autocomplete_endpoint(
+async def autocomplete_endpoint(
     q: str = Query(..., min_length=1),
     plz: str = Query(settings.DEFAULT_PLZ),
 ) -> dict:
+    plz = plz.strip()
+    await ensure_fresh(plz)
     return {"suggestions": autocomplete(q, plz)}
 
 
 @app.get("/basket")
-def basket_endpoint(
+async def basket_endpoint(
     items: list[str] = Query(..., description="Repeat ?items= for each item"),
     plz: str = Query(settings.DEFAULT_PLZ),
     lat: Optional[float] = None,
     lon: Optional[float] = None,
     max_distance_km: Optional[float] = None,
 ) -> dict:
+    plz = plz.strip()
+    await ensure_fresh(plz)
     return best_basket(items, plz, lat=lat, lon=lon, max_distance_km=max_distance_km)
 
 
