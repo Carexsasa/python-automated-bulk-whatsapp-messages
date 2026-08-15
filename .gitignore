@@ -5,6 +5,10 @@ __pycache__/
 *.db
 backend/grocery.db
 
+# local secrets / config (keep .env.example, ignore real .env)
+.env
+backend/.env
+
 # Android / Gradle
 android/.gradle/
 android/build/

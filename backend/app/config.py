@@ -1,8 +1,23 @@
-"""Runtime configuration, all overridable via environment variables."""
+"""Runtime configuration, all overridable via environment variables.
+
+Values can be set as real environment variables or placed in a ``.env`` file in the
+backend folder (easiest on Windows — no need to fiddle with `set`/System Properties).
+See ``.env.example``.
+"""
 from __future__ import annotations
 
 import os
 from datetime import date
+
+# Load a .env file from the backend folder if python-dotenv is available (it ships with
+# uvicorn[standard]). This runs before Settings reads any variable.
+try:
+    from dotenv import load_dotenv
+
+    _here = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))  # backend/
+    load_dotenv(os.path.join(_here, ".env"))
+except Exception:
+    pass
 
 
 def _env_set(name: str) -> set[str]:

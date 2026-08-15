@@ -103,6 +103,30 @@ def basket_endpoint(
 
 @app.post("/admin/refresh")
 async def admin_refresh(plz: str = Query(settings.DEFAULT_PLZ)) -> dict:
-    """Manual refresh trigger (for dev / ops). In prod, protect this."""
+    """Manual refresh trigger — fetches live offers for a region and reports diagnostics.
+
+    Use this to pull real Marktguru data. The `connectors` field shows per-source status
+    and any error, so you can tell whether the live fetch succeeded.
+    """
+    plz = plz.strip()
     n = await refresh_region(plz)
-    return {"plz": plz, "offer_week": offer_week(), "written": n}
+    states = db.get_connector_states()
+    connectors = {
+        src: {"status": r["status"], "last_error": r["last_error"]}
+        for src, r in states.items()
+    }
+    hint = None
+    if n == 0:
+        hint = (
+            "0 offers written. If not in demo mode, the Marktguru fetch likely failed to "
+            "authenticate — see docs/live-marktguru-setup.md to capture MARKTGURU_CLIENT_KEY "
+            "and MARKTGURU_API_KEY into your .env, then refresh again."
+        )
+    return {
+        "plz": plz,
+        "offer_week": offer_week(),
+        "written": n,
+        "demo_mode": settings.DEMO_MODE,
+        "connectors": connectors,
+        "hint": hint,
+    }
