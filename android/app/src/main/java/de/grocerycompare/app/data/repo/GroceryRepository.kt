@@ -5,6 +5,7 @@ import de.grocerycompare.app.data.local.OfferEntity
 import de.grocerycompare.app.data.local.WatchedDao
 import de.grocerycompare.app.data.local.WatchedItemEntity
 import de.grocerycompare.app.data.remote.GroceryApi
+import de.grocerycompare.app.data.remote.dto.BasketDto
 import de.grocerycompare.app.data.remote.dto.OfferDto
 import javax.inject.Inject
 import javax.inject.Singleton
@@ -42,6 +43,14 @@ class GroceryRepository @Inject constructor(
 
     suspend fun autocomplete(query: String, plz: String): List<String> =
         runCatching { api.autocomplete(query, plz).suggestions }.getOrDefault(emptyList())
+
+    /** Shopping-list optimization: best single store vs cheapest-per-item split. */
+    suspend fun basket(
+        items: List<String>,
+        plz: String,
+        lat: Double? = null,
+        lon: Double? = null,
+    ): Result<BasketDto> = runCatching { api.basket(items, plz, lat, lon) }
 
     suspend fun watch(query: String, plz: String) =
         watchedDao.upsert(WatchedItemEntity(query = query, plz = plz))

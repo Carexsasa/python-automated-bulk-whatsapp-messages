@@ -15,6 +15,7 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.debounce
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.flatMapLatest
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 
@@ -36,13 +37,19 @@ class SearchViewModel @Inject constructor(
     private val _ui = MutableStateFlow(SearchUiState())
     val ui: StateFlow<SearchUiState> = _ui.asStateFlow()
 
-    private val submitted = MutableStateFlow("")
+    // the (query, plz) actually submitted; results react to both.
+    private val submitted = MutableStateFlow("" to "80331")
 
     // offline-first: results always come from the Room cache; refresh feeds the cache.
     val results: StateFlow<List<OfferEntity>> = submitted
         .distinctUntilChanged()
-        .flatMapLatest { q -> repo.observeOffers(q, _ui.value.plz) }
+        .flatMapLatest { (q, plz) -> repo.observeOffers(q, plz) }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
+
+    /** Set of query strings the user is currently watching (for the bell toggle). */
+    val watchedQueries: StateFlow<Set<String>> = repo.observeWatched()
+        .map { list -> list.map { it.query }.toSet() }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptySet())
 
     init {
         // debounced autocomplete as the user types
@@ -62,11 +69,12 @@ class SearchViewModel @Inject constructor(
 
     fun submit(lat: Double? = null, lon: Double? = null, maxDistanceKm: Double? = null) {
         val q = _ui.value.query.trim()
+        val plz = _ui.value.plz.trim()
         if (q.isEmpty()) return
-        submitted.value = q
+        submitted.value = q to plz
         _ui.value = _ui.value.copy(loading = true, error = null, suggestions = emptyList())
         viewModelScope.launch {
-            val res = repo.refreshOffers(q, _ui.value.plz, lat, lon, maxDistanceKm)
+            val res = repo.refreshOffers(q, plz, lat, lon, maxDistanceKm)
             _ui.value = _ui.value.copy(
                 loading = false,
                 offline = res.isFailure,   // still shows cached results underneath
